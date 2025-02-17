@@ -119,6 +119,21 @@ class PortfolioBacktester:
 
         return monthly_returns.map(lambda x: f"{x:.2f}%")
 
+    
+    def calculate_cagr(self, portfolio_df):
+        """
+        연평균 수익률을 (CAGR) 계산한다.
+        """
+        start_value = self.initial_balance
+        end_value = portfolio_df["Portfolio_Value"].iloc[-1]
+        num_years = (portfolio_df.index[-1] - portfolio_df.index[0]).days / 365.0
+
+        if num_years <= 0:
+            return "N/A"
+
+        cagr = ((end_value / start_value) ** (1 / num_years)) - 1
+        return f"{cagr * 100:.2f}%"
+
 
     def plot_results(self, portfolio_df):
         """
@@ -153,6 +168,8 @@ class PortfolioBacktester:
 
 
 if __name__ == "__main__":
+    print("portfolio backtest start")
+
     symbols = ["BTC/USDT", "ETH/USDT"]
     start_date = "2023-01-01"
     end_date = "2024-12-31"
@@ -171,6 +188,7 @@ if __name__ == "__main__":
     portfolio_df = backtester.run_backtest()
 
     mdd = backtester.calculate_mdd(portfolio_df)
+    cagr = backtester.calculate_cagr(portfolio_df)
     total_return = backtester.calculate_total_return(portfolio_df)
     monthly_returns = backtester.calculate_monthly_returns(portfolio_df)
 
@@ -178,8 +196,9 @@ if __name__ == "__main__":
     print(monthly_returns)
 
     print(f"📉 Maximum Drawdown (MDD): {mdd:.2f}%")
-    print(f"📈 Total Return: {total_return:.2f}%")
+    print(f"📈 Total Return (ROI)): {total_return:.2f}%")
+    print(f"📊 Compound Annual Growth Rate (CAGR): {cagr}")
 
-    # 결과 시각화
-    # backtester.plot_results(portfolio_df)
+    # 시각화
     # backtester.compare_with_benchmark(portfolio_df)
+    print("portfolio backtest end")
