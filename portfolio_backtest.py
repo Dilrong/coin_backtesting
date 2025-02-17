@@ -3,9 +3,21 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 class PortfolioBacktester:
-    def __init__(self, exchange_id, symbols, weights, timeframe="1d", initial_balance=10000, 
-                 start_date=None, end_date=None, rebalance_period="1M", trading_fee=0.001, slippage=0.0005):
+    def __init__(
+        self,
+        exchange_id,
+        symbols,
+        weights,
+        timeframe="1d",
+        initial_balance=10000,
+        start_date=None,
+        end_date=None,
+        rebalance_period="1M",
+        trading_fee=0.001,
+        slippage=0.0005,
+    ):
         self.exchange = getattr(ccxt, exchange_id)()
         self.symbols = symbols
         self.weights = weights
@@ -28,11 +40,17 @@ class PortfolioBacktester:
                 if not ohlcv:
                     raise ValueError(f"No data found for {symbol}")
 
-                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                df = pd.DataFrame(
+                    ohlcv,
+                    columns=["timestamp", "open", "high", "low", "close", "volume"],
+                )
+                df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
 
                 if self.start_date and self.end_date:
-                    df = df[(df['timestamp'] >= self.start_date) & (df['timestamp'] <= self.end_date)]
+                    df = df[
+                        (df["timestamp"] >= self.start_date)
+                        & (df["timestamp"] <= self.end_date)
+                    ]
 
                 df.set_index("timestamp", inplace=True)
                 self.data[symbol] = df
@@ -45,7 +63,9 @@ class PortfolioBacktester:
         """
         수익률률 계산을 한다.
         """
-        portfolio_df = pd.DataFrame(index=pd.date_range(self.start_date, self.end_date, freq="D"))
+        portfolio_df = pd.DataFrame(
+            index=pd.date_range(self.start_date, self.end_date, freq="D")
+        )
 
         for symbol in self.symbols:
             df = self.data[symbol].copy()
@@ -53,9 +73,12 @@ class PortfolioBacktester:
             portfolio_df = portfolio_df.join(df[f"{symbol}_return"], how="left")
 
         portfolio_df.fillna(0, inplace=True)
-        portfolio_df["Portfolio_Return"] = sum(portfolio_df[f"{symbol}_return"] * self.weights[symbol] for symbol in self.symbols)
+        portfolio_df["Portfolio_Return"] = sum(
+            portfolio_df[f"{symbol}_return"] * self.weights[symbol]
+            for symbol in self.symbols
+        )
         return portfolio_df
-        
+
     def calculate_monthly_returns(self, portfolio_df):
         """
         월별 수익률을 계산하여 반환
@@ -65,12 +88,13 @@ class PortfolioBacktester:
 
         return monthly_returns.map(lambda x: f"{x*100:.2f}%")
 
-
     def apply_trading_fees(self, portfolio_df):
         """
         수수료 적용을 한다.
         """
-        transaction_cost = (self.trading_fee + self.slippage) * portfolio_df["Portfolio_Value"]
+        transaction_cost = (self.trading_fee + self.slippage) * portfolio_df[
+            "Portfolio_Value"
+        ]
         portfolio_df["Portfolio_Value"] -= transaction_cost
         return portfolio_df
 
@@ -88,15 +112,28 @@ class PortfolioBacktester:
             daily_return = portfolio_df.iloc[i]["Portfolio_Return"]
 
             if date in rebalance_dates:
-                current_prices = {symbol: self.data[symbol]["close"].reindex(portfolio_df.index).ffill().loc[date] for symbol in self.symbols}
+                current_prices = {
+                    symbol: self.data[symbol]["close"]
+                    .reindex(portfolio_df.index)
+                    .ffill()
+                    .loc[date]
+                    for symbol in self.symbols
+                }
                 if any(np.isnan(price) for price in current_prices.values()):
                     continue
 
-                total_value = sum(current_prices[symbol] * self.weights[symbol] for symbol in self.symbols)
+                total_value = sum(
+                    current_prices[symbol] * self.weights[symbol]
+                    for symbol in self.symbols
+                )
                 for symbol in self.symbols:
-                    self.weights[symbol] = (current_prices[symbol] * self.weights[symbol]) / total_value
+                    self.weights[symbol] = (
+                        current_prices[symbol] * self.weights[symbol]
+                    ) / total_value
 
-            portfolio_df.loc[date, "Portfolio_Value"] = float(portfolio_df.iloc[i - 1]["Portfolio_Value"]) * (1 + daily_return)
+            portfolio_df.loc[date, "Portfolio_Value"] = float(
+                portfolio_df.iloc[i - 1]["Portfolio_Value"]
+            ) * (1 + daily_return)
 
         portfolio_df = self.apply_trading_fees(portfolio_df)
         return portfolio_df
@@ -108,7 +145,7 @@ class PortfolioBacktester:
         peak = portfolio_df["Portfolio_Value"].cummax()
         drawdown = (portfolio_df["Portfolio_Value"] - peak) / peak
         return drawdown.min() * 100
-    
+
     def calculate_cagr(self, portfolio_df):
         """
         연평균 수익률을 (CAGR) 계산한다.
@@ -123,24 +160,46 @@ class PortfolioBacktester:
         cagr = ((end_value / start_value) ** (1 / num_years)) - 1
         return f"{cagr * 100:.2f}%"
 
-
     def calculate_total_return(self, portfolio_df):
         """
         총 수익률을 계산한다.
         """
-        return (portfolio_df["Portfolio_Value"].iloc[-1] / self.initial_balance - 1) * 100
+        return (
+            portfolio_df["Portfolio_Value"].iloc[-1] / self.initial_balance - 1
+        ) * 100
 
     def compare_with_benchmark(self, portfolio_df):
         """
-        비트코인 벤치마크를 해본다.
+        비트코인 단독 투자와 포트폴리오를 비교한다.
         """
+        if "BTC/USDT" not in self.data:
+            print("🚨 BTC/USDT 데이터가 없습니다. 벤치마크 비교를 할 수 없습니다.")
+            return
+
         btc_df = self.data["BTC/USDT"].copy()
-        btc_df["BTC_Benchmark"] = (1 + btc_df["close"].pct_change()).cumprod() * self.initial_balance
+
+        btc_df["BTC_Benchmark"] = (
+            1 + btc_df["close"].pct_change().fillna(0)
+        ).cumprod() * self.initial_balance
+
+        btc_df = btc_df.reindex(portfolio_df.index).ffill()
+
         portfolio_df = portfolio_df.join(btc_df["BTC_Benchmark"], how="left")
 
-        plt.figure(figsize=(12,6))
-        plt.plot(portfolio_df.index, portfolio_df["Portfolio_Value"], label="Portfolio", color="blue")
-        plt.plot(portfolio_df.index, portfolio_df["BTC_Benchmark"], label="BTC Only", color="orange", linestyle="dashed")
+        plt.figure(figsize=(12, 6))
+        plt.plot(
+            portfolio_df.index,
+            portfolio_df["Portfolio_Value"],
+            label="Portfolio",
+            color="blue",
+        )
+        plt.plot(
+            portfolio_df.index,
+            portfolio_df["BTC_Benchmark"],
+            label="BTC Only",
+            color="orange",
+            linestyle="dashed",
+        )
         plt.title("Portfolio vs. BTC Benchmark")
         plt.xlabel("Date")
         plt.ylabel("Portfolio Value ($)")
@@ -153,7 +212,12 @@ class PortfolioBacktester:
         시각화를 한다.
         """
         plt.figure(figsize=(12, 6))
-        plt.plot(portfolio_df.index, portfolio_df["Portfolio_Value"], label="Portfolio Value", color="blue")
+        plt.plot(
+            portfolio_df.index,
+            portfolio_df["Portfolio_Value"],
+            label="Portfolio Value",
+            color="blue",
+        )
         plt.title("Portfolio Value Over Time")
         plt.xlabel("Date")
         plt.ylabel("Portfolio Value ($)")
@@ -161,18 +225,26 @@ class PortfolioBacktester:
         plt.grid()
         plt.show()
 
+
 if __name__ == "__main__":
     print("portfolio backtest start")
-    
+
     symbols = ["BTC/USDT", "ETH/USDT", "DOT/USDT", "USDC/USDT"]
     weights = {"BTC/USDT": 0.4, "ETH/USDT": 0.2, "DOT/USDT": 0.2, "USDC/USDT": 0.2}
 
     start_date = "2022-01-01"
-    end_date = "2025-01-01"
+    end_date = "2025-01-31"
     rebalance_period = "1M"
 
-    backtester = PortfolioBacktester(exchange_id="binance", symbols=symbols, weights=weights, timeframe="1M", 
-                                     start_date=start_date, end_date=end_date, rebalance_period=rebalance_period)
+    backtester = PortfolioBacktester(
+        exchange_id="binance",
+        symbols=symbols,
+        weights=weights,
+        timeframe="1M",
+        start_date=start_date,
+        end_date=end_date,
+        rebalance_period=rebalance_period,
+    )
 
     backtester.fetch_data()
     portfolio_df = backtester.run_backtest()
@@ -189,5 +261,5 @@ if __name__ == "__main__":
     print(f"📈 Total Return (ROI)): {total_return:.2f}%")
     print(f"📊 Compound Annual Growth Rate (CAGR): {cagr}")
 
-    # backtester.compare_with_benchmark(portfolio_df)    
+    backtester.compare_with_benchmark(portfolio_df)
     print("portfolio backtest end")

@@ -3,10 +3,14 @@
 ## Get Started
 
 ```zsh
+# Create venv
+python -m venv venv
 # In Linux
 source venv/bin/activate
 # In Windows
 venv\Scripts\activate
+# Install
+pip install -r requirements.txt
 ```
 
 - select type
